@@ -1,9 +1,10 @@
-int safeState = LOW;    //initialised as LOW to ensure no false positives on startup
+int safeState = LOW;              //initialised as LOW to ensure no false positives on startup
 int caseState = 0;
 
 int redLedState = LOW;
 int FIRE = 0;
-int FIREtime = 500;               //length of fuel release (ms)
+int fireTime = 1000;               //length of fuel release (ms)
+int flameON = LOW;
 
 const int inputPin = 4;           //User input to control the Fire breath
 const int solenoidPin = 3;        //Output to power the solenoid (which releases the fuel)
@@ -39,123 +40,145 @@ void setup()
 
 void loop()
 {
-  
+
   safeState = digitalRead(ObstructionSensor);     //Read the safety proximity sensor
 
   if (safeState == LOW)   //This means there is no obstruction, therefore safe to fire
   {
-     // put your main code here, to run repeatedly:
+    // put your main code here, to run repeatedly:
 
-  inputState = digitalRead(inputPin);   //read user input pin
+    inputState = digitalRead(inputPin);   //read user input pin
 
-  if (inputState != inputStatePrv) // If the switch changed, due to noise or pressing
-  {
-
-    if ((millis() - lastDebounceTime) > debounceDelay)    //Check if switch is still pressed after debounce delay
+    if (inputState != inputStatePrv) // If the switch changed, due to noise or pressing
     {
 
-      lastDebounceTime = millis();    //set debounce time to be the clock time
+      if ((millis() - lastDebounceTime) > debounceDelay)    //Check if switch is still pressed after debounce delay
+      {
 
-      if (inputState == LOW)          //If pin change and user input is present
-      {
-        FIRE = 1;                     //Set FIRE variable to 1, this is non 0 and the count continues from here
+        lastDebounceTime = millis();    //set debounce time to be the clock time
+
+        if (inputState == LOW)          //If pin change and user input is present
+        {
+          FIRE = 1;                     //Set FIRE variable to 1, this is non 0 and the count continues from here
+        }
+        else                            //If pin change and no user input is present
+        {
+          caseState = 0;                //caseState back to zero
+        }
       }
-      else                            //If pin change and no user input is present
+
+    }
+
+    inputStatePrv = inputState;         //used for debounce
+
+    //caseState logic
+    //this uses the FIRE variable to set which case to go into
+    if (FIRE != 0)
+    {
+      if (FIRE < 5)
       {
-        caseState = 0;                //caseState back to zero
+        caseState = 1;
+      }
+      else if (FIRE == 8)
+      {
+        caseState = 2;
+      }
+      else if (FIRE == 14)
+      {
+        caseState = 3;
+      }
+      else if (FIRE == 15)
+      {
+        caseState = 0;
+      }
+    }
+
+    //Logic for all cases
+    switch (caseState)
+    {
+      //No Fire, solid red led. This is the base case
+      case 0:
+        digitalWrite(solenoidPin, LOW);
+        digitalWrite(ledRed, HIGH);
+        digitalWrite(ledGreen, LOW);
         FIRE = 0;                     //reset FIRE variable
-      }
+        break;
+
+      //No fire, flashing red led (slower flash rate)
+      //This method means flashing leds can be created that do not rely on delay() functions
+      case 1:
+        currentMillis = millis();
+        if ((currentMillis - previousMillis) >= flashRate1)  //using flash rate 1 variable, this controls ON and OFF time
+        {
+          previousMillis = currentMillis;
+
+          if (redLedState == LOW)
+          {
+            redLedState = HIGH;
+            FIRE++;                   //Incremenets FIRE variable when eyes are lit red, this is used to set the caseState
+          }
+          else
+          {
+            redLedState = LOW;
+          }
+          digitalWrite(ledRed, redLedState);
+        }
+        break;
+
+      //No fire, flashing red led (faster flash rate)
+      //This method means flashing leds can be created that do not rely on delay() functions
+      case 2:
+        currentMillis = millis();
+        if ((currentMillis - previousMillis) >= flashRate2)   //using flash rate 1 variable, this controls ON and OFF time
+        {
+          previousMillis = currentMillis;
+
+          if (redLedState == LOW)
+          {
+            redLedState = HIGH;
+            FIRE++;                   //Incremenets FIRE variable when eyes are lit red, this is used to set the caseState
+          }
+          else
+          {
+            redLedState = LOW;
+          }
+          digitalWrite(ledRed, redLedState);
+        }
+        break;
+
+      //FIRE!! & Solid red led
+      case 3:
+        //digitalWrite(solenoidPin, HIGH);
+        //delay(fireTime);
+        //digitalWrite(solenoidPin, LOW);
+        currentMillis = millis();
+        if ((currentMillis - previousMillis) >= fireTime)   //using flash rate 1 variable, this controls ON and OFF time
+        {
+          previousMillis = currentMillis;
+          if (flameON == LOW)
+          {
+            flameON = HIGH;
+          }
+          else
+          {
+            flameON = LOW;
+            FIRE++;
+          }
+          digitalWrite(solenoidPin, flameON);
+        }
+        break;
+
     }
 
   }
-
-  inputStatePrv = inputState;         //used for debounce
-
-  //caseState logic
-  //this uses the FIRE variable to set which case to go into
-  if (FIRE != 0)    
-  {
-    if (FIRE < 5)
-    {
-      caseState = 1;
-    }
-    if (FIRE == 8)
-    {
-      caseState = 2;
-    }
-    else if (FIRE == 14)
-    {
-      caseState = 3;
-    }
-  }
-
-//Logic for all cases
-  switch (caseState)
-  {
-    //No Fire, solid red led. This is the base case
-    case 0:
-      digitalWrite(solenoidPin, LOW);
-      digitalWrite(ledRed, HIGH);
-      digitalWrite(ledGreen, LOW);
-      break;
-
-    //No fire, flashing red led (slower flash rate)
-    //This method means flashing leds can be created that do not rely on delay() functions
-    case 1:
-      currentMillis = millis();
-      if ((currentMillis - previousMillis) >= flashRate1)  //using flash rate 1 variable, this controls ON and OFF time
-      {
-        previousMillis = currentMillis;
-
-        if (redLedState == LOW)
-        {
-          redLedState = HIGH;
-          FIRE++;                   //Incremenets FIRE variable when eyes are lit red, this is used to set the caseState
-        }
-        else
-        {
-          redLedState = LOW;
-        }
-        digitalWrite(ledRed, redLedState);
-      }
-      break;
-
-    //No fire, flashing red led (faster flash rate)
-    //This method means flashing leds can be created that do not rely on delay() functions
-    case 2:
-      currentMillis = millis();
-      if ((currentMillis - previousMillis) >= flashRate2)   //using flash rate 1 variable, this controls ON and OFF time
-      {
-        previousMillis = currentMillis;
-
-        if (redLedState == LOW)
-        {
-          redLedState = HIGH;
-          FIRE++;                   //Incremenets FIRE variable when eyes are lit red, this is used to set the caseState
-        }
-        else
-        {
-          redLedState = LOW;
-        }
-        digitalWrite(ledRed, redLedState);
-      }
-      break;
-
-    //FIRE!! & Solid red led
-    case 3:
-      digitalWrite(solenoidPin, HIGH);
-      digitalWrite(ledRed, HIGH);
-      digitalWrite(ledGreen, LOW);
-      break;
-
-  }
-
-}
   else
   {
     digitalWrite(solenoidPin, LOW);   //Ensure fuel supply is stopped (or cannot start)
     caseState = 0;                    //reset caseState for when obstuction is removed
     FIRE = 0;                         //reset FIRE variable, so sequence must begin again
-    digitalWrite(ledGreen, HIGH);     //Light eyes green to show in 'safe mode' therefore cannot fire
+    //digitalWrite(ledGreen, HIGH);   //Light eyes green to show in 'safe mode' therefore cannot fire
+    analogWrite(ledGreen, 50);        //I am using analogWrite as the green led on my RGB led is super bright!
+    digitalWrite(ledRed, LOW);        //Turn off red LED
   }
+
 }
