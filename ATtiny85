@@ -1,0 +1,161 @@
+int safeState = LOW;    //initialised as LOW to ensure no false positives on startup
+int caseState = 0;
+
+int redLedState = LOW;
+int FIRE = 0;
+int FIREtime = 500;               //length of fuel release (ms)
+
+const int inputPin = 4;           //User input to control the Fire breath
+const int solenoidPin = 3;        //Output to power the solenoid (which releases the fuel)
+const int ObstructionSensor = 2;  //Input from a proximity sensor
+const int ledRed = 1;             //Output to control the eyes (red leds)
+const int ledGreen = 0;           //Used to show the it will not fire (obstruction sensed)
+
+int inputState = 0;               //varible to hold the state of the user input
+int inputStatePrv = 0;            //holds the previous user input (htese 2 variables are used for button debounce)
+int debounceDelay = 10;           //Button must be pressed for 10ms before accepted as a genuine input
+unsigned long lastDebounceTime = 0; //records time of last debounce (button pressed)
+
+unsigned long currentMillis;      //Used for led flashing (instead of requiring a 'delay()' command)
+unsigned long previousMillis = 0; //Used for led flashing (instead of requiring a 'delay()' command)
+const long flashRate1 = 400;      //First flash rate (400ms ON, 400ms OFF)
+const long flashRate2 = 200;      //Second flash rate (200ms ON, 200ms OFF)
+
+void setup()
+{
+  // put your setup code here, to run once:
+
+  //Pin mapping
+  pinMode(inputPin, INPUT_PULLUP);    //Switch pulls to Ground
+  pinMode(solenoidPin, OUTPUT);
+  pinMode(ObstructionSensor, INPUT);  //Looking for HIGH to be safeToFire, eternal PullDown resistor is used
+  pinMode(ledRed, OUTPUT);
+  pinMode(ledGreen, OUTPUT);
+
+  //Set initial caseState
+  caseState = 0;            //caseState is used to setup the different modes. It is initiallised to zero.
+
+}
+
+void loop()
+{
+  
+  safeState = digitalRead(ObstructionSensor);     //Read the safety proximity sensor
+
+  if (safeState == LOW)   //This means there is no obstruction, therefore safe to fire
+  {
+     // put your main code here, to run repeatedly:
+
+  inputState = digitalRead(inputPin);   //read user input pin
+
+  if (inputState != inputStatePrv) // If the switch changed, due to noise or pressing
+  {
+
+    if ((millis() - lastDebounceTime) > debounceDelay)    //Check if switch is still pressed after debounce delay
+    {
+
+      lastDebounceTime = millis();    //set debounce time to be the clock time
+
+      if (inputState == LOW)          //If pin change and user input is present
+      {
+        FIRE = 1;                     //Set FIRE variable to 1, this is non 0 and the count continues from here
+      }
+      else                            //If pin change and no user input is present
+      {
+        caseState = 0;                //caseState back to zero
+        FIRE = 0;                     //reset FIRE variable
+      }
+    }
+
+  }
+
+  inputStatePrv = inputState;         //used for debounce
+
+  //caseState logic
+  //this uses the FIRE variable to set which case to go into
+  if (FIRE != 0)    
+  {
+    if (FIRE < 5)
+    {
+      caseState = 1;
+    }
+    if (FIRE == 8)
+    {
+      caseState = 2;
+    }
+    else if (FIRE == 14)
+    {
+      caseState = 3;
+    }
+  }
+
+//Logic for all cases
+  switch (caseState)
+  {
+    //No Fire, solid red led. This is the base case
+    case 0:
+      digitalWrite(solenoidPin, LOW);
+      digitalWrite(ledRed, HIGH);
+      digitalWrite(ledGreen, LOW);
+      break;
+
+    //No fire, flashing red led (slower flash rate)
+    //This method means flashing leds can be created that do not rely on delay() functions
+    case 1:
+      currentMillis = millis();
+      if ((currentMillis - previousMillis) >= flashRate1)  //using flash rate 1 variable, this controls ON and OFF time
+      {
+        previousMillis = currentMillis;
+
+        if (redLedState == LOW)
+        {
+          redLedState = HIGH;
+          FIRE++;                   //Incremenets FIRE variable when eyes are lit red, this is used to set the caseState
+        }
+        else
+        {
+          redLedState = LOW;
+        }
+        digitalWrite(ledRed, redLedState);
+      }
+      break;
+
+    //No fire, flashing red led (faster flash rate)
+    //This method means flashing leds can be created that do not rely on delay() functions
+    case 2:
+      currentMillis = millis();
+      if ((currentMillis - previousMillis) >= flashRate2)   //using flash rate 1 variable, this controls ON and OFF time
+      {
+        previousMillis = currentMillis;
+
+        if (redLedState == LOW)
+        {
+          redLedState = HIGH;
+          FIRE++;                   //Incremenets FIRE variable when eyes are lit red, this is used to set the caseState
+        }
+        else
+        {
+          redLedState = LOW;
+        }
+        digitalWrite(ledRed, redLedState);
+      }
+      break;
+
+    //FIRE!! & Solid red led
+    case 3:
+      digitalWrite(solenoidPin, HIGH);
+      digitalWrite(ledRed, HIGH);
+      digitalWrite(ledGreen, LOW);
+      break;
+
+  }
+
+}
+  else
+  {
+    digitalWrite(solenoidPin, LOW);   //Ensure fuel supply is stopped (or cannot start)
+    caseState = 0;                    //reset caseState for when obstuction is removed
+    FIRE = 0;                         //reset FIRE variable, so sequence must begin again
+    digitalWrite(ledGreen, HIGH);     //Light eyes green to show in 'safe mode' therefore cannot fire
+  }
+}
