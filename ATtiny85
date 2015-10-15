@@ -64,6 +64,7 @@ void loop()
         else                            //If pin change and no user input is present
         {
           caseState = 0;                //caseState back to zero
+          FIRE = 0;                     //resest FIRE variable, this aborts the sequence when button is released
         }
       }
 
@@ -96,12 +97,12 @@ void loop()
     //Logic for all cases
     switch (caseState)
     {
-      //No Fire, solid red led. This is the base case
+      //No Fire, solid red led. This is the base case, user input will be accepted
+      //and fire sequence can begin
       case 0:
         digitalWrite(solenoidPin, LOW);
         digitalWrite(ledRed, HIGH);
         digitalWrite(ledGreen, LOW);
-        FIRE = 0;                     //reset FIRE variable
         break;
 
       //No fire, flashing red led (slower flash rate)
@@ -173,6 +174,7 @@ void loop()
   }
   else
   {
+    //This is effictively case 4, or the 'safe case'
     digitalWrite(solenoidPin, LOW);   //Ensure fuel supply is stopped (or cannot start)
     caseState = 0;                    //reset caseState for when obstuction is removed
     FIRE = 0;                         //reset FIRE variable, so sequence must begin again
